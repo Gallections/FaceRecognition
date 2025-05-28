@@ -3,6 +3,7 @@ import face_recognition_models
 import face_recognition
 import cv2
 import os
+from datetime import datetime
 
 path = "attendeeImages"
 images = []
@@ -12,8 +13,8 @@ myList = os.listdir(path)
 for cl in myList:
     curImage = cv2.imread(f'{path}/{cl}')
     images.append(curImage)
-    fileName = os.path.splitext(cl)[0]
-    classNames.append(fileName.split("_")[0] + " " + fileName.split("_")[1])
+    fileName = os.path.splitext(cl)[0].title()
+    classNames.append(" ".join(fileName.split("_")))
 
 def findEncodings(images):
     encodeList = []
@@ -23,6 +24,19 @@ def findEncodings(images):
         encodeList.append(imgEncodings)
 
     return encodeList
+
+def markAttendance(name):
+    with open('attendance.csv', 'r+') as f:
+        myDataList = f.readlines()
+        nameList = set()
+        for line in myDataList:
+            entry = line.split(',')
+            nameList.add(entry[0])
+        if name not in nameList:
+            now = datetime.now()
+            dtString = now.strftime('%H:%M:%S')
+            f.writelines(f'\n{name},{dtString}')
+
 print(classNames)
 
 encodeListForKnownFaces = findEncodings(images)
@@ -48,22 +62,15 @@ while True:
         bestMatchIndex = np.argmin(faceDistance)
 
         if matches[bestMatchIndex]:
-            name = classNames[bestMatchIndex].upper()
+            name = classNames[bestMatchIndex].title()
             print(name)
             y1, x2, y2, x1 = faceLocation
             y1, x2, y2, x1 = y1*4, x2*4, y2*4, x1*4
             cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv2.rectangle(img, (x1, y2 - 35), (x2, y2), (0, 255, 0), cv2.FILLED)
             cv2.putText(img, name, (x1+ 6, y2-6), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 2)
+            markAttendance(name)
 
     # We can opt to show the webcam
     cv2.imshow("Webcam", img)
     cv2.waitKey(1)
-
-
-
-# imgTarget = face_recognition.load_image_file('imageBasics/will_ferrel.jpg')
-# imgTarget = cv2.cvtColor(imgTarget, cv2.COLOR_BGR2RGB)
-# imgTest = face_recognition.load_image_file("imageBasics/chad_smith.jpg")
-# imgTest = cv2.cvtColor(imgTest, cv2.COLOR_BGR2RGB)
-
