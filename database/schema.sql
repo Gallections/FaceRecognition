@@ -10,7 +10,16 @@ CREATE TABLE name (
 
 CREATE TABLE encoding (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    person_id UUID REFERENCES name(id) ON DELETE CASCADE,
+    person_id UUID DEFAULT uuid_generate_v4(),
+    FOREIGN KEY (person_id) REFERENCES name(id) ON DELETE CASCADE,
     face_encoding JSONB,
     date_create TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE images (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    person_id UUID DEFAULT uuid_generate_v4(),
+    FOREIGN KEY (person_id) REFERENCES name(id) ON DELETE CASCADE,
+    image BYTEA,
+    data_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)

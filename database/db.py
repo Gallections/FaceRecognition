@@ -37,7 +37,8 @@ if __name__ == "__main__":
     conn = get_connection()
     # run_schema(conn, "schema.sql")
     # insert_name(conn, 'Brennan', 'Johnson')
-    insert_face_encoding(conn, '4eb034ea-0826-489f-a749-6b554c1c27ba', jsonSample)
+    # insert_face_encoding(conn, 'f20662bc-6969-4458-9a7c-57175afb239b', jsonSample)
+    remove_name(conn, 'f20662bc-6969-4458-9a7c-57175afb239b')
     close_connection(conn)
 
 

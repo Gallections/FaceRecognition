@@ -45,9 +45,34 @@ def insert_face_encoding(conn, person_id, encoding):
 def remove_face_encoding(conn, id):
     try:
         with conn.cursor() as cursor:  # using context manager automatically closes the cursor when done
-            cursor.execute("DELETE FROM name WHERE id = %s", (id,))
+            cursor.execute("DELETE FROM encoding WHERE id = %s", (id,))
         conn.commit()
         print(f"Successfully removed {id} from encoding.")
+    except Exception as e:
+        conn.rollback()
+        raise e
+
+
+def insert_image_bytes(conn, person_id, image_byte):
+    try:
+        query = ("INSERT INTO encoding (person_id, image)"
+                 "VALUES (%s, %s)"
+                 "RETURNING id")
+
+        with conn.cursor() as cursor:
+            cursor.execute(query, (person_id, image_byte))
+
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+
+def remove_image_bytes(conn, id):
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM images WHERE id = %s", (id,))
+        conn.commit()
+        print(f"Successfully removed {id} from images.")
     except Exception as e:
         conn.rollback()
         raise e
