@@ -1,5 +1,5 @@
 import psycopg2
-from queries import *
+from database.queries import *
 import json
 import numpy as np
 

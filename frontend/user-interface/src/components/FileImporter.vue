@@ -2,15 +2,15 @@
   import {ref} from 'vue'
 
   // ------- some important endpoints info ------
-  const imageEndpoint = "/api/uploads/images";
-  const host = "http://localhost:8000"
+  const imageEndpoint = "api/uploads/images";
+  const host = "http://localhost:8000/"
   let fileToBeUploaded: undefined | File = undefined;
 
 
   const imagePreview = ref<string>('');
   const imageInput = ref<HTMLInputElement | null>(null);
-  const firstNameInput = ref<HTMLInputElement | null>(null)
-  const lastNameInput = ref<HTMLInputElement | null>(null)
+  let firstNameInput = ref<string>("")
+  let lastNameInput = ref<string>("")
 
 
   function handleFileUpload(event: Event) {
@@ -32,11 +32,11 @@
   }
 
   function triggerBackendUpload() {
-      if (!firstNameInput.value?.value) {
+      if (!firstNameInput.value) {
         window.alert("You must input the first name!")
         return
       }
-      if (!lastNameInput.value?.value) {
+      if (!lastNameInput.value) {
         window.alert("You must input the last name!")
         return
       }
@@ -49,8 +49,8 @@
       // upload to API
       const formData = new FormData();
       formData.append('imgUpload', fileToBeUploaded);
-      formData.append("firstName", firstNameInput.value.value)
-      formData.append('lastName', lastNameInput.value.value)
+      formData.append("firstName", firstNameInput.value)
+      formData.append('lastName', lastNameInput.value)
 
       fetch(`${host}${imageEndpoint}`, {
         method: "POST",
@@ -67,6 +67,8 @@
     imageInput.value = null;
     imagePreview.value ='';
     fileToBeUploaded = undefined;
+    firstNameInput.value = '';
+    lastNameInput.value ='';
   }
 
 </script>
@@ -90,7 +92,7 @@
       <div class="input-container">
         <label>First Name:</label>
         <input
-            ref = "firstNameInput"
+            v-model="firstNameInput"
             type="text"
             style="display:inline-block"
             required
@@ -100,7 +102,7 @@
       <div class="input-container">
         <label>Last Name:</label>
         <input
-            ref ="lastNameInput"
+            v-model="lastNameInput"
             type="text"
             style="display:inline-block"
             required
@@ -156,10 +158,12 @@
   }
 
   #image-previewer {
-    width:300px;
-    height:300px;
+    width:400px;
+    height:auto;
     display:block;
     justify-self: center;
+    margin-bottom:1rem;
+    margin-top:1rem;
   }
 
   .input-container{

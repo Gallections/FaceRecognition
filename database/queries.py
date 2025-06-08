@@ -10,11 +10,9 @@ def insert_name(conn, first_name, last_name, full_name=""):
             )
             new_id = cursor.fetchone()[0]
         conn.commit()
-        print(new_id)
         return new_id
     except Exception as e:
         conn.rollback()
-        print(e)
         raise e
 
 def remove_name(conn, id):
@@ -55,7 +53,7 @@ def remove_face_encoding(conn, id):
 
 def insert_image_bytes(conn, person_id, image_byte):
     try:
-        query = ("INSERT INTO encoding (person_id, image)"
+        query = ("INSERT INTO images (person_id, image)"
                  "VALUES (%s, %s)"
                  "RETURNING id")
 

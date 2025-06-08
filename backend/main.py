@@ -4,12 +4,23 @@ from typing import Annotated
 import shutil
 import os
 from process import *
+from database.db import get_connection, close_connection
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+conn = get_connection()
 
 app = FastAPI()
 
+origins = [
+    "http://localhost:5173",  # frontend origin
+    # you can add more origins here if needed
+    "http://localhost:5174"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins =["*"],
+    allow_origins =origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -39,8 +50,9 @@ async def upload_image(
         shutil.copyfileobj(imgUpload.file, buffer)
 
     # Store all the information to database
-    # !!!!!!!!!!! needs to be implemented!
-
+    person_id = store_new_person(conn, firstName, lastName)
+    store_encodings(conn, person_id, img_encodings)
+    store_img_bytes(conn, person_id, img_bytes)
 
     return {"message": "Upload successful",
             "first name": firstName,
