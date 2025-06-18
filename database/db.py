@@ -38,15 +38,5 @@ if __name__ == "__main__":
     # run_schema(conn, "schema.sql")
     # insert_name(conn, 'Brennan', 'Johnson')
     # insert_face_encoding(conn, 'f20662bc-6969-4458-9a7c-57175afb239b', jsonSample)
-    remove_name(conn, 'f20662bc-6969-4458-9a7c-57175afb239b')
+    # remove_name(conn, 'f20662bc-6969-4458-9a7c-57175afb239b')
     close_connection(conn)
-
-
-
-# cursor = conn.cursor()
-# cursor.execute("select * from employee")
-# data = cursor.fetchall()
-#
-# for d in data:
-#     print(d)
-# conn.close()

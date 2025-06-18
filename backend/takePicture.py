@@ -1,0 +1,1 @@
+## TODO: take a picture using the camera, then extracts all human images from the scene.
