@@ -1,64 +1,60 @@
-from fastapi import FastAPI, File, UploadFile, Form
+"""
+Face Recognition Attendance System - FastAPI Application
+"""
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Annotated
-import shutil
-import os
-from process import *
-from database.db import get_connection, close_connection
+from contextlib import asynccontextmanager
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from backend.config import settings
+from backend.api.routes import persons, face_recognition, attendance
+from database.db import DatabaseManager
 
-conn = get_connection()
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifecycle - database connections and cleanup"""
+    DatabaseManager.initialize_pool()
+    print(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} - Database: {settings.DB_NAME}")
+    yield
+    DatabaseManager.close_all_connections()
+    print("👋 Shutdown complete")
 
-origins = [
-    "http://localhost:5173",  # frontend origin
-    # you can add more origins here if needed
-    "http://localhost:5174"
-]
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    description="Face Recognition Attendance System API",
+    lifespan=lifespan
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins =origins,
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
 )
 
-USER_UPLOAD_DIR = "./uploads"
-os.makedirs(USER_UPLOAD_DIR, exist_ok=True)
+# Register API routes
+app.include_router(persons.router, prefix=settings.API_PREFIX)
+app.include_router(face_recognition.router, prefix=settings.API_PREFIX)
+app.include_router(attendance.router, prefix=settings.API_PREFIX)
+
 
 @app.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {
+        "app": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "docs": "/docs"
+    }
 
-@app.post("/api/uploads/images")
-async def upload_image(
-        imgUpload: Annotated[UploadFile, File()],
-        firstName: str = Form("no description"),
-        lastName: str = Form("no description")):
 
-    img_bytes = await imgUpload.read()
-    img_encodings = calculate_img_encodings(img_bytes)
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
-    if img_encodings == "":
-        return {"message": "Upload Invalid: No face is detected"}
 
-    file_location = os.path.join(USER_UPLOAD_DIR, imgUpload.filename)
-    with open(file_location, "wb") as buffer:
-        shutil.copyfileobj(imgUpload.file, buffer)
-
-    # Store all the information to database
-    person_id = store_new_person(conn, firstName, lastName)
-    store_encodings(conn, person_id, img_encodings)
-    store_img_bytes(conn, person_id, img_bytes)
-
-    return {"message": "Upload successful",
-            "first name": firstName,
-            "last name": lastName,
-            "filename": imgUpload.filename}
-
-@app.get("/api/feature")
-async def feature():
-    return {"feature-message": "This is a feature message"}
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=settings.DEBUG)

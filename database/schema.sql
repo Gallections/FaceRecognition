@@ -22,4 +22,11 @@ CREATE TABLE images (
     FOREIGN KEY (person_id) REFERENCES name(id) ON DELETE CASCADE,
     image BYTEA,
     data_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE attendance (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    person_id UUID,
+    FOREIGN KEY (person_id) REFERENCES name(id) ON DELETE CASCADE,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
