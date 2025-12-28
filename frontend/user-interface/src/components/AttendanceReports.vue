@@ -14,6 +14,14 @@ const startDate = ref<string>('')
 const endDate = ref<string>('')
 const personAttendance = ref<AttendanceRecord[]>([])
 const isLoadingPersonAttendance = ref(false)
+const notification = ref<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+
+function showNotification(message: string, type: 'success' | 'error' | 'info' = 'info') {
+  notification.value = { message, type }
+  setTimeout(() => {
+    notification.value = null
+  }, 4000)
+}
 
 onMounted(async () => {
   await loadPersons()
@@ -33,7 +41,7 @@ async function loadAttendanceByDate() {
   try {
     attendanceRecords.value = await apiService.getAttendanceByDate(selectedDate.value)
   } catch (error: any) {
-    window.alert(`Error: ${error.message}`)
+    showNotification(`Error: ${error.message}`, 'error')
   } finally {
     isLoading.value = false
   }
@@ -41,7 +49,7 @@ async function loadAttendanceByDate() {
 
 async function loadPersonAttendance() {
   if (!selectedPersonId.value) {
-    window.alert('Please select a person!')
+    showNotification('Please select a person', 'error')
     return
   }
 
@@ -53,7 +61,7 @@ async function loadPersonAttendance() {
       endDate.value || undefined
     )
   } catch (error: any) {
-    window.alert(`Error: ${error.message}`)
+    showNotification(`Error: ${error.message}`, 'error')
   } finally {
     isLoadingPersonAttendance.value = false
   }
@@ -63,9 +71,9 @@ async function exportTodayCSV() {
   try {
     const blob = await apiService.exportTodayAttendanceCSV()
     downloadBlob(blob, `attendance_today_${new Date().toISOString().split('T')[0]}.csv`)
-    window.alert('CSV exported successfully!')
+    showNotification('CSV exported successfully!', 'success')
   } catch (error: any) {
-    window.alert(`Error: ${error.message}`)
+    showNotification(`Error: ${error.message}`, 'error')
   }
 }
 
@@ -73,9 +81,9 @@ async function exportDateCSV() {
   try {
     const blob = await apiService.exportAttendanceCSVByDate(selectedDate.value)
     downloadBlob(blob, `attendance_${selectedDate.value}.csv`)
-    window.alert('CSV exported successfully!')
+    showNotification('CSV exported successfully!', 'success')
   } catch (error: any) {
-    window.alert(`Error: ${error.message}`)
+    showNotification(`Error: ${error.message}`, 'error')
   }
 }
 
@@ -98,7 +106,17 @@ function getSelectedPersonName(): string {
 
 <template>
   <div class="attendance-reports">
-    <h2>Attendance Reports</h2>
+    <!-- Notification Toast -->
+    <div v-if="notification" :class="['notification-toast', `notification-${notification.type}`]">
+      <span class="notification-icon">
+        {{ notification.type === 'success' ? '✓' : notification.type === 'error' ? '✕' : 'ℹ' }}
+      </span>
+      <span class="notification-message">{{ notification.message }}</span>
+      <button @click="notification = null" class="notification-close">×</button>
+    </div>
+
+    <h2>📊 Attendance Reports & Analytics</h2>
+    <p class="page-subtitle">View, filter, and export attendance records</p>
 
     <div class="reports-grid">
       <!-- Export Today's Attendance -->
@@ -218,8 +236,14 @@ function getSelectedPersonName(): string {
 }
 
 h2 {
-  margin-bottom: 2rem;
+  margin-bottom: 0.5rem;
   color: #333;
+}
+
+.page-subtitle {
+  color: #666;
+  margin-bottom: 2rem;
+  font-size: 1rem;
 }
 
 .reports-grid {
@@ -429,5 +453,32 @@ h2 {
 
 .attendance-table tr:hover {
   background: #f9f9f9;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .reports-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .date-range {
+    grid-template-columns: 1fr;
+  }
+  
+  .notification-toast {
+    left: 1rem;
+    right: 1rem;
+    top: 1rem;
+    z-index: 9999;
+  }
+  
+  .attendance-table {
+    font-size: 0.9rem;
+  }
+  
+  .attendance-table th,
+  .attendance-table td {
+    padding: 0.5rem;
+  }
 }
 </style>

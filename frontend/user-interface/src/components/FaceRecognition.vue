@@ -10,6 +10,14 @@ const isRecognizing = ref(false)
 const recognitionResult = ref<FaceRecognitionResponse | null>(null)
 const showWebcam = ref(false)
 const webcamMode = ref<'capture' | 'realtime'>('capture')
+const notification = ref<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+
+function showNotification(message: string, type: 'success' | 'error' | 'info' = 'info') {
+  notification.value = { message, type }
+  setTimeout(() => {
+    notification.value = null
+  }, 5000)
+}
 
 function handleFileUpload(event: Event) {
   const input = event.target as HTMLInputElement
@@ -32,7 +40,7 @@ function triggerFileUpload() {
 
 async function recognizeFace() {
   if (!selectedFile.value) {
-    window.alert('Please select an image first!')
+    showNotification('Please select an image first', 'error')
     return
   }
 
@@ -44,12 +52,12 @@ async function recognizeFace() {
     recognitionResult.value = result
 
     if (result.success && result.full_name) {
-      window.alert(`✅ Recognized: ${result.full_name}\nConfidence: ${(result.confidence! * 100).toFixed(1)}%`)
+      showNotification(`✅ Recognized: ${result.full_name} (${(result.confidence! * 100).toFixed(1)}% confidence)`, 'success')
     } else {
-      window.alert(`❌ ${result.message}`)
+      showNotification(result.message || 'No face recognized', 'error')
     }
   } catch (error: any) {
-    window.alert(`Error: ${error.message}`)
+    showNotification(`Error: ${error.message}`, 'error')
   } finally {
     isRecognizing.value = false
   }
@@ -119,8 +127,17 @@ async function handleWebcamCapture(blob: Blob) {
 
 <template>
   <div class="face-recognition">
-    <h2>Face Recognition</h2>
-    <p class="subtitle">Upload a photo or use your camera to identify who it is</p>
+    <!-- Notification Toast -->
+    <div v-if="notification" :class="['notification-toast', `notification-${notification.type}`]">
+      <span class="notification-icon">
+        {{ notification.type === 'success' ? '✓' : notification.type === 'error' ? '✕' : 'ℹ' }}
+      </span>
+      <span class="notification-message">{{ notification.message }}</span>
+      <button @click="notification = null" class="notification-close">×</button>
+    </div>
+
+    <h2>🔍 Face Recognition</h2>
+    <p class="page-subtitle">Upload a photo or use your camera to identify registered persons</p>
 
     <input
       type="file"
@@ -171,7 +188,9 @@ async function handleWebcamCapture(blob: Blob) {
     </div>
 
     <div v-else class="empty-state">
-      <p>👆 Click "Select Image" to upload a photo or "Use Camera" to capture live</p>
+      <div class="empty-icon">📸</div>
+      <h3>No Image Selected</h3>
+      <p>Choose an option above to get started with face recognition</p>
     </div>
 
     <!-- Webcam Modal -->
@@ -196,6 +215,12 @@ async function handleWebcamCapture(blob: Blob) {
 h2 {
   margin-bottom: 0.5rem;
   color: #333;
+}
+
+.page-subtitle {
+  color: #666;
+  margin-bottom: 2rem;
+  font-size: 1rem;
 }
 
 .subtitle {
@@ -365,10 +390,24 @@ h3 {
 .empty-state {
   text-align: center;
   padding: 4rem 2rem;
-  color: #999;
-  font-size: 1.2rem;
   background: #f9f9f9;
   border-radius: 8px;
   border: 2px dashed #ddd;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+  color: #555;
+  font-size: 1.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+  color: #999;
+  font-size: 1rem;
 }
 </style>

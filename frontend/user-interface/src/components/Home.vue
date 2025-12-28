@@ -43,11 +43,19 @@ function navigateTo(path: string) {
           Fast, accurate, and secure.
         </p>
         <div class="hero-actions">
-          <button @click="navigateTo('/attendance')" class="btn-primary">
+          <button 
+            @click="navigateTo('/attendance')" 
+            class="btn-primary"
+            aria-label="Go to attendance marking page"
+          >
             <span>✓</span>
             Mark Attendance
           </button>
-          <button @click="navigateTo('/file_import')" class="btn-secondary">
+          <button 
+            @click="navigateTo('/file_import')" 
+            class="btn-secondary"
+            aria-label="Go to person registration page"
+          >
             <span>📤</span>
             Register New Person
           </button>
@@ -86,25 +94,57 @@ function navigateTo(path: string) {
     <section class="features">
       <h2 class="section-title">Key Features</h2>
       <div class="features-grid">
-        <div class="feature-card" @click="navigateTo('/recognize')">
+        <div 
+          class="feature-card" 
+          @click="navigateTo('/recognize')"
+          @keypress.enter="navigateTo('/recognize')"
+          @keypress.space="navigateTo('/recognize')"
+          tabindex="0"
+          role="button"
+          aria-label="Go to face recognition page"
+        >
           <div class="feature-icon">🔍</div>
           <h3>Face Recognition</h3>
           <p>Instantly identify individuals from photos with high accuracy</p>
         </div>
         
-        <div class="feature-card" @click="navigateTo('/attendance')">
+        <div 
+          class="feature-card" 
+          @click="navigateTo('/attendance')"
+          @keypress.enter="navigateTo('/attendance')"
+          @keypress.space="navigateTo('/attendance')"
+          tabindex="0"
+          role="button"
+          aria-label="Go to attendance dashboard"
+        >
           <div class="feature-icon">⏱️</div>
           <h3>Real-time Tracking</h3>
           <p>Mark attendance instantly with facial recognition or manual entry</p>
         </div>
         
-        <div class="feature-card" @click="navigateTo('/reports')">
+        <div 
+          class="feature-card" 
+          @click="navigateTo('/reports')"
+          @keypress.enter="navigateTo('/reports')"
+          @keypress.space="navigateTo('/reports')"
+          tabindex="0"
+          role="button"
+          aria-label="Go to reports and analytics page"
+        >
           <div class="feature-icon">📈</div>
           <h3>Detailed Reports</h3>
           <p>Export attendance records and view comprehensive analytics</p>
         </div>
         
-        <div class="feature-card" @click="navigateTo('/persons')">
+        <div 
+          class="feature-card" 
+          @click="navigateTo('/persons')"
+          @keypress.enter="navigateTo('/persons')"
+          @keypress.space="navigateTo('/persons')"
+          tabindex="0"
+          role="button"
+          aria-label="Go to person management page"
+        >
           <div class="feature-icon">⚙️</div>
           <h3>Easy Management</h3>
           <p>Add, edit, or remove persons from the system with ease</p>
@@ -116,19 +156,35 @@ function navigateTo(path: string) {
     <section class="quick-actions">
       <h2 class="section-title">Quick Actions</h2>
       <div class="actions-grid">
-        <button @click="navigateTo('/file_import')" class="action-btn">
+        <button 
+          @click="navigateTo('/file_import')" 
+          class="action-btn"
+          aria-label="Upload new person image"
+        >
           <span class="action-icon">📤</span>
           <span class="action-text">Upload New Image</span>
         </button>
-        <button @click="navigateTo('/recognize')" class="action-btn">
+        <button 
+          @click="navigateTo('/recognize')" 
+          class="action-btn"
+          aria-label="Recognize face from image"
+        >
           <span class="action-icon">🔍</span>
           <span class="action-text">Recognize Face</span>
         </button>
-        <button @click="navigateTo('/attendance')" class="action-btn">
+        <button 
+          @click="navigateTo('/attendance')" 
+          class="action-btn"
+          aria-label="View attendance records"
+        >
           <span class="action-icon">✓</span>
           <span class="action-text">View Attendance</span>
         </button>
-        <button @click="navigateTo('/reports')" class="action-btn">
+        <button 
+          @click="navigateTo('/reports')" 
+          class="action-btn"
+          aria-label="Export attendance reports"
+        >
           <span class="action-icon">📊</span>
           <span class="action-text">Export Reports</span>
         </button>
@@ -288,6 +344,15 @@ function navigateTo(path: string) {
   border-color: var(--primary-color);
 }
 
+.feature-card:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.feature-card:focus:not(:focus-visible) {
+  outline: none;
+}
+
 .feature-icon {
   font-size: 3rem;
   margin-bottom: 1rem;
@@ -331,10 +396,18 @@ function navigateTo(path: string) {
 
 .action-btn:hover {
   border-color: var(--primary-color);
-  background: var(--primary-color);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   transform: translateY(-4px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
+}
+
+.action-btn:hover .action-icon {
+  transform: scale(1.1);
+}
+
+.action-btn:hover .action-text {
+  color: white;
 }
 
 .action-icon {

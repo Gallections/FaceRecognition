@@ -152,8 +152,12 @@ function close() {
     
     <div class="webcam-container">
       <div class="webcam-header">
-        <h3>{{ mode === 'realtime' ? '🎥 Real-time Detection' : '📷 Camera Capture' }}</h3>
-        <button @click="close" class="btn-close">✕</button>
+        <h3 id="webcam-title">{{ mode === 'realtime' ? '🎥 Real-time Detection' : '📷 Camera Capture' }}</h3>
+        <button 
+          @click="close" 
+          class="btn-close"
+          aria-label="Close camera"
+        >✕</button>
       </div>
 
       <div v-if="error" class="error-message">
@@ -167,6 +171,7 @@ function close() {
             autoplay 
             playsinline
             class="webcam-video"
+            aria-label="Live camera feed"
           ></video>
           
           <!-- Real-time Detection Overlay -->
@@ -200,16 +205,38 @@ function close() {
         <canvas ref="canvasRef" style="display: none;"></canvas>
 
         <div class="webcam-controls">
-          <button v-if="mode === 'capture'" @click="capturePhoto" :disabled="!isActive" class="btn-capture">
+          <button 
+            v-if="mode === 'capture'" 
+            @click="capturePhoto" 
+            :disabled="!isActive" 
+            class="btn-capture"
+            aria-label="Capture photo from camera"
+          >
             📸 Capture Photo
           </button>
-          <button v-else-if="isDetecting" @click="stopDetection" class="btn-pause">
+          <button 
+            v-else-if="isDetecting" 
+            @click="stopDetection" 
+            class="btn-pause"
+            aria-label="Pause real-time detection"
+          >
             ⏸ Pause Detection
           </button>
-          <button v-else @click="startRealtimeDetection" class="btn-resume">
+          <button 
+            v-else 
+            @click="startRealtimeDetection" 
+            class="btn-resume"
+            aria-label="Resume real-time detection"
+          >
             ▶ Resume Detection
           </button>
-          <button @click="close" class="btn-cancel">Close</button>
+          <button 
+            @click="close" 
+            class="btn-cancel"
+            aria-label="Close camera and cancel"
+          >
+            Close
+          </button>
         </div>
 
         <p class="webcam-hint">

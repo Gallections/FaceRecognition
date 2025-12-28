@@ -1,7 +1,27 @@
 <script setup lang="ts">
-  import {ref, onMounted} from 'vue'
+  import {ref, onMounted, computed} from 'vue'
   import { apiService, type PersonResponse } from '../services/apiService'
   import WebcamCapture from './WebcamCapture.vue'
+  import ConfirmDialog from './ConfirmDialog.vue'
+
+  const filteredPersons = computed(() => {
+    if (!searchQuery.value.trim()) {
+      return persons.value
+    }
+    const query = searchQuery.value.toLowerCase()
+    return persons.value.filter(p => 
+      p.full_name.toLowerCase().includes(query) ||
+      p.first_name.toLowerCase().includes(query) ||
+      p.last_name.toLowerCase().includes(query)
+    )
+  })
+
+  function showNotification(message: string, type: 'success' | 'error' | 'info' = 'info') {
+    notification.value = { message, type }
+    setTimeout(() => {
+      notification.value = null
+    }, 5000)
+  }
 
   const imagePreview = ref<string>('');
   const imageInput = ref<HTMLInputElement | null>(null);
@@ -19,11 +39,15 @@
   const isPersonsListVisible = ref(true)
   const expandedPersons = ref<Set<string>>(new Set())
   const editingPerson = ref<PersonResponse | null>(null)
+  const searchQuery = ref<string>('')
+  const notification = ref<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
   const editFormData = ref({ first_name: '', last_name: '' })
   const editPhotoPreview = ref<string>('')
   const editPhotoFile = ref<File | undefined>(undefined)
   const editPhotoInput = ref<HTMLInputElement | null>(null)
   const webcamMode = ref<'register' | 'edit'>('register')
+  const showDeleteConfirm = ref(false)
+  const personToDelete = ref<PersonResponse | null>(null)
 
   onMounted(async () => {
     await loadPersons()
@@ -103,29 +127,40 @@
         await apiService.updatePersonImage(editingPerson.value.id, editPhotoFile.value)
       }
       
-      window.alert('Person updated successfully!')
+      showNotification('Person updated successfully!', 'success')
       editingPerson.value = null
       editFormData.value = { first_name: '', last_name: '' }
       editPhotoPreview.value = ''
       editPhotoFile.value = undefined
       await loadPersons()
     } catch (err: any) {
-      window.alert(`Error: ${err.message}`)
+      showNotification(`Error: ${err.message}`, 'error')
     }
   }
 
-  async function deletePerson(person: PersonResponse) {
-    if (!window.confirm(`Delete ${person.full_name}? This cannot be undone.`)) {
-      return
-    }
+  function confirmDelete(person: PersonResponse) {
+    personToDelete.value = person
+    showDeleteConfirm.value = true
+  }
+
+  async function deletePerson() {
+    if (!personToDelete.value) return
 
     try {
-      await apiService.deletePerson(person.id)
-      window.alert('Person deleted successfully!')
+      await apiService.deletePerson(personToDelete.value.id)
+      showNotification('Person deleted successfully!', 'success')
       await loadPersons()
     } catch (err: any) {
-      window.alert(`Error: ${err.message}`)
+      showNotification(`Error: ${err.message}`, 'error')
+    } finally {
+      showDeleteConfirm.value = false
+      personToDelete.value = null
     }
+  }
+
+  function cancelDelete() {
+    showDeleteConfirm.value = false
+    personToDelete.value = null
   }
 
 
@@ -148,17 +183,17 @@
   }
 
   async function triggerBackendUpload() {
-      if (!firstNameInput.value) {
-        window.alert("You must input the first name!")
+      if (!firstNameInput.value.trim()) {
+        showNotification("First name is required", 'error')
         return
       }
-      if (!lastNameInput.value) {
-        window.alert("You must input the last name!")
+      if (!lastNameInput.value.trim()) {
+        showNotification("Last name is required", 'error')
         return
       }
 
       if (!fileToBeUploaded) {
-        window.alert("You must select an Image first!")
+        showNotification("Please select an image first", 'error')
         return;
       }
 
@@ -174,13 +209,13 @@
         )
         
         uploadMessage.value = response.message
-        window.alert(`Success! ${response.message}`)
+        showNotification(`✅ ${response.message}`, 'success')
         clearInput()
         await loadPersons() // Reload persons list
         
       } catch (error: any) {
         uploadMessage.value = `Error: ${error.message}`
-        window.alert(`Error: ${error.message}`)
+        showNotification(`Error: ${error.message}`, 'error')
       } finally {
         isUploading.value = false
       }
@@ -252,6 +287,15 @@
 
 <template>
   <div class="person-registration">
+    <!-- Notification Toast -->
+    <div v-if="notification" :class="['notification-toast', `notification-${notification.type}`]">
+      <span class="notification-icon">
+        {{ notification.type === 'success' ? '✓' : notification.type === 'error' ? '✕' : 'ℹ' }}
+      </span>
+      <span class="notification-message">{{ notification.message }}</span>
+      <button @click="notification = null" class="notification-close">×</button>
+    </div>
+
     <!-- Upload Section -->
     <section class="upload-section">
       <h2>📤 Register New Person</h2>
@@ -263,12 +307,19 @@
           ref = "imageInput"
           @change ="handleFileUpload"
           accept = "image/*"
+          aria-label="Upload person image"
           style="display:none"
         />
 
         <div class="button-group-horizontal">
           <button class="btn-select" @click="triggerFileUpload">📁 Select Image</button>
-          <button class="btn-camera" @click="openWebcam">📷 Capture Photo</button>
+          <button class="btn-camera" @click="openWebcam">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+            Capture Photo
+          </button>
         </div>
 
         <div v-if="imagePreview" class="upload-preview-container">
@@ -310,7 +361,12 @@
         </div>
 
         <div v-else class="upload-empty">
-          <div class="empty-icon">📸</div>
+          <div class="empty-icon">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+          </div>
           <p>Select an image or capture a photo to begin registration</p>
         </div>
       </div>
@@ -319,21 +375,36 @@
     <!-- Registered Persons Section -->
     <section class="persons-section">
       <div class="section-header">
-        <h2>👥 Registered Persons ({{ persons.length }})</h2>
+        <div class="section-header-left">
+          <h2>👥 Registered Persons ({{ filteredPersons.length }}{{ searchQuery ? ` of ${persons.length}` : '' }})</h2>
+        </div>
         <div class="header-actions">
+          <input 
+            v-model="searchQuery" 
+            type="text" 
+            placeholder="🔍 Search persons..." 
+            class="search-input"
+          />
           <button @click="expandAll" class="btn-toggle">Show All</button>
           <button @click="collapseAll" class="btn-toggle">Hide All</button>
         </div>
       </div>
 
-      <div v-if="isLoadingPersons" class="loading">Loading persons...</div>
+      <div v-if="isLoadingPersons" class="loading">
+        <div class="spinner"></div>
+        <p>Loading persons...</p>
+      </div>
+
+      <div v-else-if="filteredPersons.length === 0 && searchQuery" class="empty-state">
+        No persons found matching "{{ searchQuery }}"
+      </div>
 
       <div v-else-if="persons.length === 0" class="empty-state">
         No persons registered yet. Upload a photo above to get started!
       </div>
 
       <div v-else-if="isPersonsListVisible" class="persons-list">
-        <div v-for="person in persons" :key="person.id" class="person-item">
+        <div v-for="person in filteredPersons" :key="person.id" class="person-item">
           <!-- Person Header (Always Visible) -->
           <div class="person-header" @click="togglePerson(person.id)">
             <div class="person-header-left">
@@ -343,16 +414,29 @@
                   :src="personImages.get(person.id)" 
                   :alt="person.full_name"
                 />
-                <span v-else class="avatar-placeholder">👤</span>
+                <svg v-else class="avatar-placeholder" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z"/>
+                </svg>
               </div>
               <div class="person-info">
                 <h3>{{ person.full_name }}</h3>
                 <p class="person-date">Registered {{ new Date(person.date_created).toLocaleDateString() }}</p>
               </div>
             </div>
-            <button class="expand-btn" :class="{ expanded: expandedPersons.has(person.id) }">
-              {{ expandedPersons.has(person.id) ? '▼' : '▶' }}
-            </button>
+            <div class="person-header-actions">
+              <button 
+                class="delete-icon-btn" 
+                @click.stop="confirmDelete(person)"
+                title="Delete person"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/>
+                </svg>
+              </button>
+              <button class="expand-btn" :class="{ expanded: expandedPersons.has(person.id) }">
+                {{ expandedPersons.has(person.id) ? '▼' : '▶' }}
+              </button>
+            </div>
           </div>
 
           <!-- Person Details (Collapsible) -->
@@ -366,7 +450,9 @@
                   :alt="person.full_name"
                 />
                 <div v-else class="image-placeholder">
-                  <span>👤</span>
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z"/>
+                  </svg>
                 </div>
               </div>
 
@@ -390,8 +476,19 @@
               </div>
 
               <div class="person-actions">
-                <button @click="startEdit(person)" class="btn-edit">✏️ Edit</button>
-                <button @click="deletePerson(person)" class="btn-delete">🗑️ Delete</button>
+                <button @click="startEdit(person)" class="btn-edit">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                  Edit
+                </button>
+                <button @click="confirmDelete(person)" class="btn-delete">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/>
+                  </svg>
+                  Delete
+                </button>
               </div>
             </div>
 
@@ -420,7 +517,13 @@
                   />
                   <div class="button-group-horizontal">
                     <button type="button" class="btn-select" @click="triggerEditPhotoUpload">📁 Select New Image</button>
-                    <button type="button" class="btn-camera" @click="openWebcamForEdit">📷 Capture New Photo</button>
+                    <button type="button" class="btn-camera" @click="openWebcamForEdit">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                      </svg>
+                      Capture New Photo
+                    </button>
                   </div>
                   
                   <div v-if="editPhotoPreview" class="edit-photo-preview">
@@ -430,7 +533,14 @@
                 </div>
                 
                 <div class="edit-actions">
-                  <button @click="updatePerson" class="btn-save">💾 Save Changes</button>
+                  <button @click="updatePerson" class="btn-save">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+                      <polyline points="17 21 17 13 7 13 7 21"/>
+                      <polyline points="7 3 7 8 15 8"/>
+                    </svg>
+                    Save Changes
+                  </button>
                   <button @click="cancelEdit" class="btn-cancel">Cancel</button>
                 </div>
               </div>
@@ -447,6 +557,18 @@
       @capture="handleWebcamCapture"
       @close="closeWebcam"
     />
+
+    <!-- Delete Confirmation Dialog -->
+    <ConfirmDialog
+      :show="showDeleteConfirm"
+      :title="'Confirm Deletion'"
+      :message="`Are you sure you want to delete ${personToDelete?.full_name}? This action cannot be undone.`"
+      confirmText="Delete"
+      cancelText="Cancel"
+      variant="danger"
+      @confirm="deletePerson"
+      @cancel="cancelDelete"
+    />
   </div>
 </template>
 
@@ -454,6 +576,77 @@
 .person-registration {
   max-width: 1200px;
   margin: 0 auto;
+  position: relative;
+}
+
+/* Notification Toast */
+.notification-toast {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  animation: slideIn 0.3s ease;
+  max-width: 400px;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.notification-success {
+  background: #10b981;
+  color: white;
+}
+
+.notification-error {
+  background: #ef4444;
+  color: white;
+}
+
+.notification-info {
+  background: #3b82f6;
+  color: white;
+}
+
+.notification-icon {
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+.notification-message {
+  flex: 1;
+  font-weight: 500;
+}
+
+.notification-close {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  line-height: 1;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.notification-close:hover {
+  opacity: 1;
 }
 
 /* Upload Section */
@@ -491,33 +684,38 @@
 .btn-select, .btn-camera {
   flex: 1;
   min-width: 200px;
-  padding: 1rem 2rem;
-  font-size: 1.1rem;
-  font-weight: 600;
-  border: none;
-  border-radius: 8px;
+  padding: 0.875rem 1.75rem;
+  font-size: 1rem;
+  font-weight: 500;
+  border: 1px solid var(--border-dark);
+  border-radius: var(--border-radius);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
 .btn-select {
-  background: #4CAF50;
+  background: var(--bg-dark);
   color: white;
+  border-color: var(--bg-dark);
 }
 
 .btn-select:hover {
-  background: #45a049;
-  transform: translateY(-2px);
+  background: #0a1120;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .btn-camera {
-  background: #2196F3;
-  color: white;
+  background: white;
+  color: var(--text-primary);
 }
 
 .btn-camera:hover {
-  background: #0b7dda;
-  transform: translateY(-2px);
+  background: var(--bg-secondary);
+  border-color: var(--text-primary);
 }
 
 .upload-preview-container {
@@ -652,18 +850,40 @@
   gap: 1rem;
 }
 
+.section-header-left {
+  flex: 1;
+}
+
 .section-header h2 {
   font-size: 1.75rem;
   color: var(--text-primary);
+  margin: 0;
 }
 
 .header-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.search-input {
+  padding: 0.65rem 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  min-width: 200px;
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  border-color: var(--primary-color);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .btn-toggle {
-  padding: 0.5rem 1rem;
+  padding: 0.65rem 1.25rem;
   background: var(--primary-color);
   color: white;
   border: none;
@@ -672,20 +892,46 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .btn-toggle:hover {
   background: var(--primary-dark);
   transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
 }
 
-.loading, .empty-state {
+.loading {
   text-align: center;
   padding: 3rem;
   color: var(--text-secondary);
   background: white;
   border-radius: 12px;
   border: 1px solid var(--border-color);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 1rem;
+  border: 4px solid var(--border-color);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+  background: white;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  font-size: 1.05rem;
 }
 
 .persons-list {
@@ -696,10 +942,15 @@
 
 .person-item {
   background: white;
-  border: 2px solid var(--border-color);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   overflow: hidden;
-  transition: all 0.3s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.person-item:hover {
+  border-color: var(--border-dark);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .person-item:hover {
@@ -711,9 +962,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem;
+  padding: 1rem 1.25rem;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .person-header:hover {
@@ -728,8 +979,8 @@
 }
 
 .person-avatar {
-  width: 60px;
-  height: 60px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   overflow: hidden;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -737,6 +988,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border: 2px solid rgba(102, 126, 234, 0.2);
 }
 
 .person-avatar img {
@@ -746,34 +998,66 @@
 }
 
 .avatar-placeholder {
-  font-size: 2rem;
-  color: white;
+  color: var(--gray-400);
 }
 
 .person-info h3 {
   margin: 0 0 0.25rem 0;
-  font-size: 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
   color: var(--text-primary);
 }
 
 .person-date {
   margin: 0;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  color: var(--text-tertiary);
+}
+
+.person-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.delete-icon-btn {
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  color: #dc2626;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 8px;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-icon-btn:hover {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: white;
+  transform: scale(1.05);
+}
+
+.delete-icon-btn svg {
+  stroke-width: 2;
 }
 
 .expand-btn {
   background: transparent;
   border: none;
-  font-size: 1.25rem;
-  color: var(--text-secondary);
+  font-size: 1rem;
+  color: var(--text-tertiary);
   cursor: pointer;
-  padding: 0.5rem 1rem;
-  transition: all 0.2s;
+  padding: 0.375rem 0.75rem;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 8px;
 }
 
 .expand-btn:hover {
-  color: var(--primary-color);
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
 }
 
 .expand-btn.expanded {
@@ -859,33 +1143,40 @@
 }
 
 .btn-edit, .btn-delete {
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-edit {
-  background: #2196F3;
-  color: white;
+  background: var(--gray-100);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
 .btn-edit:hover {
-  background: #0b7dda;
-  transform: translateY(-2px);
+  background: var(--gray-200);
+  border-color: var(--border-dark);
 }
 
 .btn-delete {
-  background: #f44336;
-  color: white;
+  background: white;
+  color: #dc2626;
+  border: 2px solid #dc2626;
 }
 
 .btn-delete:hover {
-  background: #da190b;
-  transform: translateY(-2px);
+  background: #dc2626;
+  color: white;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+  transform: translateY(-1px);
 }
 
 .person-edit {
@@ -941,33 +1232,39 @@
 }
 
 .btn-save, .btn-cancel {
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  font-weight: 600;
-  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  border: 1px solid var(--border-dark);
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-save {
-  background: #4CAF50;
+  background: var(--bg-dark);
   color: white;
+  border-color: var(--bg-dark);
   flex: 1;
 }
 
 .btn-save:hover {
-  background: #45a049;
-  transform: translateY(-2px);
+  background: #0a1120;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .btn-cancel {
-  background: var(--gray-200);
+  background: white;
   color: var(--text-primary);
 }
 
 .btn-cancel:hover {
-  background: var(--gray-300);
+  background: var(--bg-secondary);
+  border-color: var(--text-primary);
 }
 
 @media (max-width: 768px) {

@@ -154,9 +154,24 @@ class AttendanceService:
         
         for record in records:
             full_name = record.get('full_name', 'Unknown')
+            # Escape commas in names
+            if ',' in full_name:
+                full_name = f'"{full_name}"'
+            
             timestamp = record.get('timestamp', '')
-            if isinstance(timestamp, datetime):
-                timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            # Convert datetime object to readable string
+            if timestamp:
+                if isinstance(timestamp, datetime):
+                    timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                elif isinstance(timestamp, str):
+                    # If already a string, try to parse and reformat
+                    try:
+                        dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                        timestamp = dt.strftime('%Y-%m-%d %H:%M:%S')
+                    except:
+                        # If parsing fails, keep the original string
+                        pass
+            
             csv_lines.append(f"{full_name},{timestamp}")
         
         return "\n".join(csv_lines)

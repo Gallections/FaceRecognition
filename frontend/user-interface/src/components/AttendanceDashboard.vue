@@ -10,6 +10,7 @@ const isMarking = ref(false)
 const markResult = ref<AttendanceMarkResponse | null>(null)
 const showWebcam = ref(false)
 const webcamMode = ref<'capture' | 'realtime'>('capture')
+const notification = ref<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
 
 // Today's attendance
 const todayAttendance = ref<AttendanceRecord[]>([])
@@ -19,6 +20,13 @@ const isLoadingAttendance = ref(false)
 const persons = ref<PersonResponse[]>([])
 const selectedPersonId = ref<string>('')
 const showManualForm = ref(false)
+
+function showNotification(message: string, type: 'success' | 'error' | 'info' = 'info') {
+  notification.value = { message, type }
+  setTimeout(() => {
+    notification.value = null
+  }, 5000)
+}
 
 onMounted(async () => {
   await loadTodayAttendance()
@@ -65,7 +73,7 @@ function triggerFileUpload() {
 
 async function markAttendanceByFace() {
   if (!selectedFile.value) {
-    window.alert('Please select an image first!')
+    showNotification('Please select an image first!', 'error')
     return
   }
 
@@ -77,14 +85,14 @@ async function markAttendanceByFace() {
     markResult.value = result
 
     if (result.success) {
-      window.alert(`✅ Attendance marked for ${result.full_name}!`)
+      showNotification(`✅ Attendance marked for ${result.full_name}!`, 'success')
       clearInput()
       await loadTodayAttendance() // Refresh the list
     } else {
-      window.alert(`❌ ${result.message}`)
+      showNotification(result.message, 'error')
     }
   } catch (error: any) {
-    window.alert(`Error: ${error.message}`)
+    showNotification(`Error: ${error.message}`, 'error')
   } finally {
     isMarking.value = false
   }
@@ -92,7 +100,7 @@ async function markAttendanceByFace() {
 
 async function markAttendanceManual() {
   if (!selectedPersonId.value) {
-    window.alert('Please select a person!')
+    showNotification('Please select a person!', 'error')
     return
   }
 
@@ -100,15 +108,15 @@ async function markAttendanceManual() {
     const result = await apiService.markAttendanceManual(selectedPersonId.value)
     
     if (result.success) {
-      window.alert(`✅ Attendance marked for ${result.full_name}!`)
+      showNotification(`✅ Attendance marked for ${result.full_name}!`, 'success')
       selectedPersonId.value = ''
       showManualForm.value = false
       await loadTodayAttendance()
     } else {
-      window.alert(`❌ ${result.message}`)
+      showNotification(result.message, 'error')
     }
   } catch (error: any) {
-    window.alert(`Error: ${error.message}`)
+    showNotification(`Error: ${error.message}`, 'error')
   }
 }
 
@@ -182,7 +190,17 @@ async function handleWebcamCapture(blob: Blob) {
 
 <template>
   <div class="attendance-dashboard">
-    <h2>Attendance Dashboard</h2>
+    <!-- Notification Toast -->
+    <div v-if="notification" :class="['notification-toast', `notification-${notification.type}`]">
+      <span class="notification-icon">
+        {{ notification.type === 'success' ? '✓' : notification.type === 'error' ? '✕' : 'ℹ' }}
+      </span>
+      <span class="notification-message">{{ notification.message }}</span>
+      <button @click="notification = null" class="notification-close">×</button>
+    </div>
+
+    <h2>✅ Attendance Dashboard</h2>
+    <p class="page-subtitle">Mark attendance using face recognition or manual entry</p>
 
     <div class="dashboard-grid">
       <!-- Mark Attendance by Face -->
@@ -193,13 +211,20 @@ async function handleWebcamCapture(blob: Blob) {
           ref="imageInput"
           @change="handleFileUpload"
           accept="image/*"
+          aria-label="Upload image for face recognition"
           style="display: none"
         />
 
         <div class="button-group-vertical">
-          <button @click="triggerFileUpload" class="btn-select">📁 Select Image</button>
-          <button @click="openWebcam" class="btn-camera">📷 Capture Photo</button>
-          <button @click="openRealtimeDetection" class="btn-realtime">🎥 Real-time Detection</button>
+          <button @click="triggerFileUpload" class="btn-select" aria-label="Select image from device">
+            📁 Select Image
+          </button>
+          <button @click="openWebcam" class="btn-camera" aria-label="Capture photo using webcam">
+            📷 Capture Photo
+          </button>
+          <button @click="openRealtimeDetection" class="btn-realtime" aria-label="Start real-time face detection">
+            🎥 Real-time Detection
+          </button>
         </div>
 
         <div v-if="imagePreview" class="preview-section">
@@ -221,13 +246,26 @@ async function handleWebcamCapture(blob: Blob) {
         </button>
 
         <div v-if="showManualForm" class="manual-form">
-          <select v-model="selectedPersonId" class="person-select">
+          <label for="person-select" class="sr-only">Select person</label>
+          <select 
+            id="person-select"
+            v-model="selectedPersonId" 
+            class="person-select"
+            aria-label="Select person to mark attendance"
+          >
             <option value="">-- Select Person --</option>
             <option v-for="person in persons" :key="person.id" :value="person.id">
               {{ person.full_name }}
             </option>
           </select>
-          <button @click="markAttendanceManual" class="btn-mark">Mark Present</button>
+          <button 
+            @click="markAttendanceManual" 
+            class="btn-mark"
+            :disabled="!selectedPersonId"
+            aria-label="Mark selected person as present"
+          >
+            Mark Present
+          </button>
         </div>
       </div>
     </div>
@@ -280,8 +318,89 @@ async function handleWebcamCapture(blob: Blob) {
 }
 
 h2 {
-  margin-bottom: 2rem;
+  margin-bottom: 0.5rem;
   color: #333;
+}
+
+.page-subtitle {
+  color: #666;
+  margin-bottom: 2rem;
+  font-size: 1rem;
+}
+
+/* Notification Toast */
+.notification-toast {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  z-index: 9999;
+  animation: slideIn 0.3s ease-out;
+  max-width: 400px;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.notification-success {
+  background: #d1fae5;
+  border: 2px solid #059669;
+  color: #065f46;
+}
+
+.notification-error {
+  background: #fee2e2;
+  border: 2px solid #dc2626;
+  color: #991b1b;
+}
+
+.notification-info {
+  background: #dbeafe;
+  border: 2px solid #3b82f6;
+  color: #1e40af;
+}
+
+.notification-icon {
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+.notification-message {
+  flex: 1;
+  font-size: 0.95rem;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.notification-close:hover {
+  opacity: 1;
 }
 
 .dashboard-grid {
